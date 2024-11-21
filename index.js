@@ -1,162 +1,84 @@
 const express = require('express')
-const cors = require('cors')
-
 const app = express()
-
+const cors = require('cors')
+const mongoose = require('mongoose')
+const multer = require('multer')
+const PORT = 3000
+const path = require('path')
 app.use(express.json())
 app.use(cors())
+app.use('/uploads',express.static("./uploads"))
 
 
-app.get("/",(req,res)=>{
-
-    const data = [
-        {
-          "uid": 1,
-          "username": "sampleuser1",
-          "image": "https://randomuser.me/api/portraits/men/1.jpg",
-          "fullname": "Sample User One",
-          "twubric": {
-            "total": 3.5,
-            "friends": 1,
-            "influence": 1,
-            "chirpiness": 1.5
-          },
-          "join_date": 1358899200
-        },
-        {
-          "uid": 2,
-          "username": "sampleuser2",
-          "image": "https://randomuser.me/api/portraits/women/2.jpg",
-          "fullname": "Sample User Two",
-          "twubric": {
-            "total": 5,
-            "friends": 1,
-            "influence": 1,
-            "chirpiness": 1.5
-          },
-          "join_date": 1355270400
-        },
-        {
-          "uid": 3,
-          "username": "sampleuser3",
-          "image": "https://randomuser.me/api/portraits/women/3.jpg",
-          "fullname": "Sample User Three",
-          "twubric": {
-            "total": 7,
-            "friends": 1,
-            "influence": 1,
-            "chirpiness": 1.5
-          },
-          "join_date": 1289433600
-        },
-        {
-          "uid": 4,
-          "username": "sampleuser4",
-          "image": "https://randomuser.me/api/portraits/men/4.jpg",
-          "fullname": "Sample User Four",
-          "twubric": {
-            "total": 9,
-            "friends": 2,
-            "influence": 3,
-            "chirpiness": 4
-          },
-          "join_date": 1300838400
-        },
-        {
-          "uid": 5,
-          "username": "sampleuser5",
-          "image": "https://randomuser.me/api/portraits/men/5.jpg",
-          "fullname": "Sample User Five",
-          "twubric": {
-            "total": 9,
-            "friends": 1,
-            "influence": 4,
-            "chirpiness": 4
-          },
-          "join_date": 1230768000
-        },
-        {
-          "uid": 6,
-          "username": "sampleuser6",
-          "image": "https://randomuser.me/api/portraits/men/6.jpg",
-          "fullname": "Sample User Six",
-          "twubric": {
-            "total": 6,
-            "friends": 2,
-            "influence": 3,
-            "chirpiness": 1
-          },
-          "join_date": 1252454400
-        },
-        {
-          "uid": 7,
-          "username": "sampleuser7",
-          "image": "https://randomuser.me/api/portraits/women/7.jpg",
-          "fullname": "Sample User Seven",
-          "twubric": {
-            "total": 8,
-            "friends": 2,
-            "influence": 4,
-            "chirpiness": 2
-          },
-          "join_date": 1278201600
-        },
-        {
-          "uid": 8,
-          "username": "sampleuser8",
-          "image": "https://randomuser.me/api/portraits/women/8.jpg",
-          "fullname": "Sample User Eight",
-          "twubric": {
-            "total": 7,
-            "friends": 2,
-            "influence": 3,
-            "chirpiness": 2
-          },
-          "join_date": 1331510400
-        },
-        {
-          "uid": 9,
-          "username": "sampleuser9",
-          "image": "https://randomuser.me/api/portraits/men/9.jpg",
-          "fullname": "Sample User Nine",
-          "twubric": {
-            "total": 8,
-            "friends": 1,
-            "influence": 4,
-            "chirpiness": 3
-          },
-          "join_date": 1367971200
-        },
-        {
-          "uid": 10,
-          "username": "sampleuser10",
-          "image": "https://randomuser.me/api/portraits/men/10.jpg",
-          "fullname": "Sample User Ten",
-          "twubric": {
-            "total": 5,
-            "friends": 1,
-            "influence": 1,
-            "chirpiness": 3
-          },
-          "join_date": 1228953600
-        }
-      ]
-
-    res.send({mesage:data})
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, './uploads')
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname))
+  }
 })
 
+const upload = multer({ storage: storage })
 
-app.post('/postData',async(req,res)=>{
-    try
-    {
-        const {name,age} = req.body
-        const userName = "Hello " + name
-        const userAge = "Your age is  "+age
-        res.send({name:userName,age:userAge})
-    }catch(err)
-    {
-            res.send(err)
+
+
+
+// database
+mongoose.connect("mongodb://localhost:27017/userDummyData").then(()=>console.log("DataBase Conknected")).catch((err)=>console.log(err))
+
+const userData = mongoose.Schema({
+    name:String,
+    age:Number,
+    email:String,
+    image:String
+})
+
+const User = mongoose.model('user',userData)
+// database
+
+app.post('/postdata',upload.single('image'),async(req,res)=>{
+    try {
+      
+      const {name,age,email} = req.body
+      let image = ""
+
+      if(req.file)
+      {
+          image = req.file.filename
+      }
+      const SavingData = new User({
+        name:name,
+        age:age,
+        email:email,
+        image:image
+      })
+
+      const savedData = await SavingData.save()
+
+      res.send(savedData)
+     
+    } catch (error) {
+      console.log(error)
     }
 })
 
-app.listen(8000,()=>console.log('server is Running!'))
+
+app.get('/getdata',async(req,res)=>{
+  try {
+      const data = await User.find()
+      res.send(data)
+  } catch (error) {
+      res.send(error)
+  }
+})
+
+app.listen(PORT,()=>console.log("server is Running!!"))
+
+
+
+
+
+
+
